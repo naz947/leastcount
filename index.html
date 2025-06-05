@@ -6,7 +6,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
-      getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, runTransaction
+      getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -40,31 +40,27 @@
         alert(`Room created! Share this Room ID: ${roomId}`);
       } else {
         roomRef = doc(db, "games", roomId);
-        try {
-          await runTransaction(db, async (transaction) => {
-            const roomSnap = await transaction.get(roomRef);
-            if (!roomSnap.exists()) {
-              alert("Room doesn't exist.");
-              throw new Error("Room not found");
-            }
-            const data = roomSnap.data();
-            if (Object.keys(data.players).length >= 8) {
-              alert("Room is full. Max 8 players allowed.");
-              throw new Error("Room full");
-            }
-            if (data.players[playerName]) {
-              alert("Name already taken in this room.");
-              throw new Error("Name taken");
-            }
-            transaction.update(roomRef, {
-              [`players.${playerName}`]: { cards: drawInitialHand() },
-              playerOrder: [...data.playerOrder, playerName]
-            });
-          });
-        } catch (error) {
-          console.error("Transaction failed: ", error);
+        const roomSnap = await getDoc(roomRef);
+        if (!roomSnap.exists()) {
+          alert("Room doesn't exist.");
           return;
         }
+
+        const data = roomSnap.data();
+        if (Object.keys(data.players).length >= 8) {
+          alert("Room is full. Max 8 players allowed.");
+          return;
+        }
+
+        if (data.players[playerName]) {
+          alert("Name already taken in this room.");
+          return;
+        }
+
+        await updateDoc(roomRef, {
+          [`players.${playerName}`]: { cards: drawInitialHand() },
+          playerOrder: [...data.playerOrder, playerName]
+        });
       }
 
       onSnapshot(roomRef, (docSnap) => {
