@@ -6,18 +6,17 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
-      getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot
+      getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, runTransaction
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCAPkebio3uHQhgHAXv-iW2HqnnAlysdTA",
-  authDomain: "leastcount-17e36.firebaseapp.com",
-  projectId: "leastcount-17e36",
-  storageBucket: "leastcount-17e36.firebasestorage.app",
-  messagingSenderId: "39529360555",
-  appId: "1:39529360555:web:b2ecb0b995221cf5d59bee",
-  measurementId: "G-BP5DCQWFZN"
-};
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
@@ -41,20 +40,31 @@ const firebaseConfig = {
         alert(`Room created! Share this Room ID: ${roomId}`);
       } else {
         roomRef = doc(db, "games", roomId);
-        const roomSnap = await getDoc(roomRef);
-        if (!roomSnap.exists()) {
-          alert("Room doesn't exist.");
+        try {
+          await runTransaction(db, async (transaction) => {
+            const roomSnap = await transaction.get(roomRef);
+            if (!roomSnap.exists()) {
+              alert("Room doesn't exist.");
+              throw new Error("Room not found");
+            }
+            const data = roomSnap.data();
+            if (Object.keys(data.players).length >= 8) {
+              alert("Room is full. Max 8 players allowed.");
+              throw new Error("Room full");
+            }
+            if (data.players[playerName]) {
+              alert("Name already taken in this room.");
+              throw new Error("Name taken");
+            }
+            transaction.update(roomRef, {
+              [`players.${playerName}`]: { cards: drawInitialHand() },
+              playerOrder: [...data.playerOrder, playerName]
+            });
+          });
+        } catch (error) {
+          console.error("Transaction failed: ", error);
           return;
         }
-        const data = roomSnap.data();
-        if (Object.keys(data.players).length >= 8) {
-          alert("Room is full. Max 8 players allowed.");
-          return;
-        }
-        await updateDoc(roomRef, {
-          [`players.${playerName}`]: { cards: drawInitialHand() },
-          playerOrder: [...data.playerOrder, playerName]
-        });
       }
 
       onSnapshot(roomRef, (docSnap) => {
