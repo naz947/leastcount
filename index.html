@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Least Count Multiplayer</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import {
+      getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCAPkebio3uHQhgHAXv-iW2HqnnAlysdTA",
+  authDomain: "leastcount-17e36.firebaseapp.com",
+  projectId: "leastcount-17e36",
+  storageBucket: "leastcount-17e36.firebasestorage.app",
+  messagingSenderId: "39529360555",
+  appId: "1:39529360555:web:b2ecb0b995221cf5d59bee",
+  measurementId: "G-BP5DCQWFZN"
+};
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let playerName = prompt("Enter your name:");
+    let roomId = prompt("Enter room ID (or type 'new' to create one):");
+    let roomRef;
+
+    async function initGame() {
+      if (roomId === 'new') {
+        roomId = Math.random().toString(36).substr(2, 6);
+        roomRef = doc(db, "games", roomId);
+        await setDoc(roomRef, {
+          players: {
+            [playerName]: { cards: drawInitialHand() }
+          },
+          playerOrder: [playerName],
+          currentTurn: playerName,
+          gameStarted: false
+        });
+        alert(`Room created! Share this Room ID: ${roomId}`);
+      } else {
+        roomRef = doc(db, "games", roomId);
+        const roomSnap = await getDoc(roomRef);
+        if (!roomSnap.exists()) {
+          alert("Room doesn't exist.");
+          return;
+        }
+        const data = roomSnap.data();
+        if (Object.keys(data.players).length >= 8) {
+          alert("Room is full. Max 8 players allowed.");
+          return;
+        }
+        await updateDoc(roomRef, {
+          [`players.${playerName}`]: { cards: drawInitialHand() },
+          playerOrder: [...data.playerOrder, playerName]
+        });
+      }
+
+      onSnapshot(roomRef, (docSnap) => {
+        const data = docSnap.data();
+        document.getElementById("room-id").innerText = `Room ID: ${roomId}`;
+        document.getElementById("status").innerText = `Current turn: ${data.currentTurn}`;
+        updateHand(data.players[playerName]?.cards || []);
+        updatePlayers(data.playerOrder);
+      });
+    }
+
+    function drawInitialHand() {
+      let hand = [];
+      for (let i = 0; i < 7; i++) hand.push(drawCard());
+      return hand;
+    }
+
+    function drawCard() {
+      const suits = ['\u2660', '\u2665', '\u2666', '\u2663'];
+      const values = [1,2,3,4,5,6,7,8,9,10,'J','Q','K'];
+      const val = values[Math.floor(Math.random() * values.length)];
+      const suit = suits[Math.floor(Math.random() * suits.length)];
+      return `${val}${suit}`;
+    }
+
+    function updateHand(cards) {
+      const handDiv = document.getElementById("hand");
+      handDiv.innerHTML = '';
+      cards.forEach((card) => {
+        const span = document.createElement("span");
+        span.textContent = card;
+        span.className = "card";
+        handDiv.appendChild(span);
+      });
+    }
+
+    function updatePlayers(playerList) {
+      const playersDiv = document.getElementById("players");
+      playersDiv.innerHTML = '<h3>Players:</h3>';
+      playerList.forEach((p, idx) => {
+        const div = document.createElement("div");
+        div.textContent = `${idx + 1}. ${p}`;
+        playersDiv.appendChild(div);
+      });
+    }
+
+    window.onload = initGame;
+  </script>
+
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; text-align: center; }
+    h1 { color: #0f0; }
+    #hand span.card {
+      display: inline-block;
+      padding: 10px;
+      border: 1px solid #fff;
+      border-radius: 5px;
+      margin: 5px;
+      background: #333;
+      font-size: 20px;
+    }
+    #players { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Least Count Multiplayer</h1>
+  <p id="room-id"></p>
+  <p id="status">Connecting...</p>
+  <div id="hand">Loading hand...</div>
+  <div id="players"></div>
+</body>
+</html>
